@@ -413,8 +413,7 @@ async function loadInvoices() {
     const snap = await getDocs(q);
     invoices = [];
     snap.forEach(doc => { invoices.push({ id: doc.id, ...doc.data() }); });
-    invoices.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-    renderInvoices(invoices);
+    filterAndSortInvoices();
 }
 
 function renderInvoices(data) {
@@ -452,13 +451,57 @@ function renderInvoices(data) {
     });
 }
 
-// Search List
-document.getElementById('searchInput').addEventListener('input', (e) => {
-    const v = e.target.value.toLowerCase();
-    const f = invoices.filter(q => 
-        q.invoiceNo.toLowerCase().includes(v) || q.customerName.toLowerCase().includes(v)
-    );
-    renderInvoices(f);
+function filterAndSortInvoices() {
+    let result = [...invoices];
+    
+    // 1. Search Query Filter
+    const searchVal = document.getElementById('searchInput').value.toLowerCase();
+    if(searchVal) {
+        result = result.filter(q => 
+            q.invoiceNo.toLowerCase().includes(searchVal) || 
+            q.customerName.toLowerCase().includes(searchVal) ||
+            (q.customerCompany && q.customerCompany.toLowerCase().includes(searchVal))
+        );
+    }
+    
+    // 2. Date Range Filter
+    const startVal = document.getElementById('filterStartDate').value;
+    const endVal = document.getElementById('filterEndDate').value;
+    if(startVal) {
+        result = result.filter(q => q.date >= startVal);
+    }
+    if(endVal) {
+        result = result.filter(q => q.date <= endVal);
+    }
+    
+    // 3. Sort
+    const sortVal = document.getElementById('sortOption').value;
+    if(sortVal === 'dateDesc') {
+        result.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+    } else if(sortVal === 'dateAsc') {
+        result.sort((a, b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));
+    } else if(sortVal === 'amountDesc') {
+        result.sort((a, b) => (b.grandTotal || 0) - (a.grandTotal || 0));
+    } else if(sortVal === 'amountAsc') {
+        result.sort((a, b) => (a.grandTotal || 0) - (b.grandTotal || 0));
+    } else if(sortVal === 'nameAsc') {
+        result.sort((a, b) => (a.customerName || '').localeCompare(b.customerName || ''));
+    } else if(sortVal === 'nameDesc') {
+        result.sort((a, b) => (b.customerName || '').localeCompare(a.customerName || ''));
+    }
+    
+    renderInvoices(result);
+}
+
+document.getElementById('searchInput').addEventListener('input', filterAndSortInvoices);
+document.getElementById('filterStartDate').addEventListener('change', filterAndSortInvoices);
+document.getElementById('filterEndDate').addEventListener('change', filterAndSortInvoices);
+document.getElementById('sortOption').addEventListener('change', filterAndSortInvoices);
+
+document.getElementById('btnClearDateFilter').addEventListener('click', () => {
+    document.getElementById('filterStartDate').value = '';
+    document.getElementById('filterEndDate').value = '';
+    filterAndSortInvoices();
 });
 
 // External Functions
@@ -604,7 +647,7 @@ function generatePDF(qData, cData, autoOpen = false) {
     
     let itemsHtml = '';
     qData.items.forEach((it, i) => {
-        itemsHtml += `<tr style="border-bottom: 1px solid #ddd;">
+        itemsHtml += `<tr style="border-bottom: 1px solid #ddd; page-break-inside: avoid; break-inside: avoid;">
             <td style="padding: 10px 5px; vertical-align: top;">${i+1}</td>
             <td style="padding: 10px 5px; vertical-align: top;">
                 <strong style="font-size: 11px;">${String(it.name).replace(/\s*\(GST\s*\d+(\.\d+)?%\)/i, '').trim()}</strong>
@@ -698,7 +741,7 @@ function generatePDF(qData, cData, autoOpen = false) {
                 </table>
             </div>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 40px; text-align: left;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 40px; text-align: left; page-break-inside: avoid; break-inside: avoid;">
                 <tr>
                     <td valign="top" width="60%">
                         <strong style="font-size: 9px;">AMOUNT IN WORDS:</strong>
@@ -748,7 +791,7 @@ function generatePDF(qData, cData, autoOpen = false) {
                 </tr>
             </table>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="text-align: left;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="text-align: left; page-break-inside: avoid; break-inside: avoid;">
                 <tr>
                     <td valign="top" width="50%">
                         <strong style="font-size: 9px;">Payment Instructions</strong>
@@ -767,7 +810,7 @@ function generatePDF(qData, cData, autoOpen = false) {
                 </tr>
             </table>
             
-            ${qData.terms ? `<div style="margin-top:30px; border-top:1px dashed #ccc; padding-top:10px;"><strong style="font-size:9px;">Terms & Conditions:</strong><br><span style="font-size:9px; white-space:pre-line;">${qData.terms}</span></div>` : ''}
+            ${qData.terms ? `<div style="margin-top:30px; border-top:1px dashed #ccc; padding-top:10px; page-break-inside: avoid; break-inside: avoid;"><strong style="font-size:9px;">Terms & Conditions:</strong><br><span style="font-size:9px; white-space:pre-line;">${qData.terms}</span></div>` : ''}
         </div>
     `;
 
@@ -776,7 +819,8 @@ function generatePDF(qData, cData, autoOpen = false) {
       filename:     `Invoice_${qData.invoiceNo}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['css', 'legacy'] }
     }).from(layoutHtml).save().then(() => {
         // done
     });

@@ -175,6 +175,31 @@ function addItemRow() {
 
 btnAddItemRow.addEventListener('click', addItemRow);
 
+document.getElementById('btnRefreshProducts').addEventListener('click', async () => {
+    showLoader();
+    try {
+        await loadProducts();
+        
+        // Update all existing dropdowns with the new products list while preserving selected values
+        const selects = document.querySelectorAll('.item-select');
+        selects.forEach(select => {
+            const selectedVal = select.value;
+            let options = '<option value="">Select Item</option>';
+            products.forEach(p => {
+                const selected = p.id === selectedVal ? 'selected' : '';
+                options += `<option value="${p.id}" data-price="${p.sellingPrice}" data-gst="${p.gstRate}" ${selected}>${p.name}</option>`;
+            });
+            select.innerHTML = options;
+        });
+        showToast("Products list refreshed!");
+    } catch (e) {
+        console.error("Error refreshing products", e);
+        showToast("Failed to refresh products", true);
+    } finally {
+        hideLoader();
+    }
+});
+
 window.itemSelected = (rowId) => {
     const row = document.getElementById(rowId);
     const select = row.querySelector('.item-select');
@@ -325,8 +350,7 @@ async function loadQuotations() {
     const snap = await getDocs(q);
     quotations = [];
     snap.forEach(doc => { quotations.push({ id: doc.id, ...doc.data() }); });
-    quotations.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-    renderQuotations(quotations);
+    filterAndSortQuotations();
 }
 
 function renderQuotations(data) {
@@ -361,15 +385,57 @@ function renderQuotations(data) {
     });
 }
 
-// Search List
-document.getElementById('searchInput').addEventListener('input', (e) => {
-    const v = e.target.value.toLowerCase();
-    const f = quotations.filter(q => 
-        q.quotationNo.toLowerCase().includes(v) || 
-        q.customerName.toLowerCase().includes(v) ||
-        (q.customerCompany && q.customerCompany.toLowerCase().includes(v))
-    );
-    renderQuotations(f);
+function filterAndSortQuotations() {
+    let result = [...quotations];
+    
+    // 1. Search Query Filter
+    const searchVal = document.getElementById('searchInput').value.toLowerCase();
+    if(searchVal) {
+        result = result.filter(q => 
+            q.quotationNo.toLowerCase().includes(searchVal) || 
+            q.customerName.toLowerCase().includes(searchVal) ||
+            (q.customerCompany && q.customerCompany.toLowerCase().includes(searchVal))
+        );
+    }
+    
+    // 2. Date Range Filter
+    const startVal = document.getElementById('filterStartDate').value;
+    const endVal = document.getElementById('filterEndDate').value;
+    if(startVal) {
+        result = result.filter(q => q.date >= startVal);
+    }
+    if(endVal) {
+        result = result.filter(q => q.date <= endVal);
+    }
+    
+    // 3. Sort
+    const sortVal = document.getElementById('sortOption').value;
+    if(sortVal === 'dateDesc') {
+        result.sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+    } else if(sortVal === 'dateAsc') {
+        result.sort((a, b) => new Date(a.date || a.createdAt) - new Date(b.date || b.createdAt));
+    } else if(sortVal === 'amountDesc') {
+        result.sort((a, b) => (b.grandTotal || 0) - (a.grandTotal || 0));
+    } else if(sortVal === 'amountAsc') {
+        result.sort((a, b) => (a.grandTotal || 0) - (b.grandTotal || 0));
+    } else if(sortVal === 'nameAsc') {
+        result.sort((a, b) => (a.customerName || '').localeCompare(b.customerName || ''));
+    } else if(sortVal === 'nameDesc') {
+        result.sort((a, b) => (b.customerName || '').localeCompare(a.customerName || ''));
+    }
+    
+    renderQuotations(result);
+}
+
+document.getElementById('searchInput').addEventListener('input', filterAndSortQuotations);
+document.getElementById('filterStartDate').addEventListener('change', filterAndSortQuotations);
+document.getElementById('filterEndDate').addEventListener('change', filterAndSortQuotations);
+document.getElementById('sortOption').addEventListener('change', filterAndSortQuotations);
+
+document.getElementById('btnClearDateFilter').addEventListener('click', () => {
+    document.getElementById('filterStartDate').value = '';
+    document.getElementById('filterEndDate').value = '';
+    filterAndSortQuotations();
 });
 
 // External Functions
@@ -512,7 +578,7 @@ function generatePDF(qData, cData, autoOpen = false) {
     
     let itemsHtml = '';
     qData.items.forEach((it, i) => {
-        itemsHtml += `<tr style="border-bottom: 1px solid #ddd;">
+        itemsHtml += `<tr style="border-bottom: 1px solid #ddd; page-break-inside: avoid; break-inside: avoid;">
             <td style="padding: 10px 5px; vertical-align: top;">${i+1}</td>
             <td style="padding: 10px 5px; vertical-align: top;">
                 <strong style="font-size: 11px;">${String(it.name).replace(/\s*\(GST\s*\d+(\.\d+)?%\)/i, '').trim()}</strong>
@@ -600,7 +666,7 @@ function generatePDF(qData, cData, autoOpen = false) {
                 </table>
             </div>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 40px; text-align: left;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 40px; text-align: left; page-break-inside: avoid; break-inside: avoid;">
                 <tr>
                     <td valign="top" width="60%">
                         <strong style="font-size: 9px;">AMOUNT IN WORDS:</strong>
@@ -640,7 +706,7 @@ function generatePDF(qData, cData, autoOpen = false) {
                 </tr>
             </table>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="text-align: left;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="text-align: left; page-break-inside: avoid; break-inside: avoid;">
                 <tr>
                     <td valign="top" width="50%">
                         <strong style="font-size: 9px;">Payment Instructions</strong>
@@ -659,7 +725,7 @@ function generatePDF(qData, cData, autoOpen = false) {
                 </tr>
             </table>
             
-            ${qData.terms ? `<div style="margin-top:30px; border-top:1px dashed #ccc; padding-top:10px;"><strong style="font-size:9px;">Terms & Conditions:</strong><br><span style="font-size:9px; white-space:pre-line;">${qData.terms}</span></div>` : ''}
+            ${qData.terms ? `<div style="margin-top:30px; border-top:1px dashed #ccc; padding-top:10px; page-break-inside: avoid; break-inside: avoid;"><strong style="font-size:9px;">Terms & Conditions:</strong><br><span style="font-size:9px; white-space:pre-line;">${qData.terms}</span></div>` : ''}
         </div>
     `;
 
@@ -668,7 +734,8 @@ function generatePDF(qData, cData, autoOpen = false) {
       filename:     `Quotation_${qData.quotationNo}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['css', 'legacy'] }
     };
 
     html2pdf().set(opt).from(layoutHtml).save().then(() => {

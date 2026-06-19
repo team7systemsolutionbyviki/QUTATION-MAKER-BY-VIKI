@@ -278,7 +278,7 @@ window.downloadLoan = (id) => {
                 </div>
             </div>
             
-            <table style="width: 100%; border-collapse: collapse; margin-top: 40px;">
+            <table style="width: 100%; border-collapse: collapse; margin-top: 40px; page-break-inside: avoid; break-inside: avoid;">
                 <thead>
                     <tr style="background: #f3f3f3;">
                         <th style="padding: 12px; border: 1px solid #ddd; text-align: left;">TRANSACTION DETAILS</th>
@@ -301,12 +301,12 @@ window.downloadLoan = (id) => {
                 </tbody>
             </table>
             
-            <div style="margin-top: 50px; padding: 20px; background: #f9f9f9; border-radius: 8px;">
+            <div style="margin-top: 50px; padding: 20px; background: #f9f9f9; border-radius: 8px; page-break-inside: avoid; break-inside: avoid;">
                 <h4 style="margin: 0 0 10px 0;">Notes / Remarks:</h4>
                 <p style="margin: 0; color: #555;">${l.description || 'No additional remarks.'}</p>
             </div>
             
-            <div style="margin-top: 60px; text-align: center; color: #999; font-size: 0.8rem; border-top: 1px solid #eee; padding-top: 10px;">
+            <div style="margin-top: 60px; text-align: center; color: #999; font-size: 0.8rem; border-top: 1px solid #eee; padding-top: 10px; page-break-inside: avoid; break-inside: avoid;">
                 <p>This is a computer-generated summary for internal use and verification purposes only.</p>
                 <p>&copy; ${new Date().getFullYear()} ${bName}</p>
             </div>
@@ -318,7 +318,8 @@ window.downloadLoan = (id) => {
         filename: `Loan_Statement_${l.name}.pdf`,
         image: { type: 'jpeg', quality: 1 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
     }).save();
 };
 

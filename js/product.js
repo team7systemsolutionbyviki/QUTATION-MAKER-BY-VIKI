@@ -13,6 +13,11 @@ const btnSync = document.getElementById('btnSync');
 auth.onAuthStateChanged(user => {
     if(user) {
         loadProducts();
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        if(urlParams.get('action') === 'add') {
+            fabAddProduct.click();
+        }
     }
 });
 
