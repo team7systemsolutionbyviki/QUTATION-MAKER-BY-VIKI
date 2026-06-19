@@ -351,6 +351,10 @@ document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
     const otherCharges = parseFloat(document.getElementById('otherCharges').value) || 0;
     const grandTotal = subTotal + totalTax + otherCharges;
     const customer = customers.find(c => c.id === customerSelect.value);
+    if(!customer) {
+        showToast("Selected customer not found in database", true);
+        return;
+    }
     const paid = parseFloat(document.getElementById('amountPaid').value) || 0;
 
     const docData = {
@@ -401,7 +405,7 @@ document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
         toggleMode(false);
     } catch(err) {
         console.error("Error saving invoice", err);
-        showToast("Error saving invoice", true);
+        showToast("Error saving invoice: " + err.message, true);
     } finally {
         hideLoader();
     }

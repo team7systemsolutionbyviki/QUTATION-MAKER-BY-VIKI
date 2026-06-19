@@ -1,4 +1,4 @@
-import { auth, db, collection, addDoc, getDocs, doc, deleteDoc, query, where, orderBy, getDoc } from './firebase.js';
+import { auth, db, collection, addDoc, getDocs, doc, deleteDoc, query, where, orderBy, getDoc, updateDoc } from './firebase.js';
 import { showToast, showLoader, hideLoader, formatCurrency, currentUser, generateId, businessData } from './app.js';
 
 const listSection = document.getElementById('listSection');
@@ -296,6 +296,10 @@ document.getElementById('quotationForm').addEventListener('submit', async (e) =>
     const otherCharges = parseFloat(document.getElementById('otherCharges').value) || 0;
     const grandTotal = subTotal + totalTax + otherCharges;
     const customer = customers.find(c => c.id === customerSelect.value);
+    if(!customer) {
+        showToast("Selected customer not found in database", true);
+        return;
+    }
 
     const docData = {
         quotationNo: qNumber.value,
@@ -338,7 +342,7 @@ document.getElementById('quotationForm').addEventListener('submit', async (e) =>
         
     } catch(err) {
         console.error("Error saving quotation", err);
-        showToast("Error saving quotation", true);
+        showToast("Error saving quotation: " + err.message, true);
     } finally {
         hideLoader();
     }
